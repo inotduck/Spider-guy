@@ -206,55 +206,79 @@
     </div>
 
     <script>
-      (function () {
-        const gate = document.getElementById("vr-gate");
-        const status = document.getElementById("vr-gate-status");
-        const scene = document.querySelector("a-scene");
-        let starting = false;
+(function () {
+  const gate = document.getElementById("vr-gate");
+  const status = document.getElementById("vr-gate-status");
+  const scene = document.querySelector("a-scene");
+  let starting = false;
 
-        async function enterVR() {
-          if (starting) return;
-          starting = true;
-          status.textContent = "Starting VR...";
+  function reset(message) {
+    starting = false;
+    status.textContent = message || "";
+  }
 
-          try {
-            if (!scene.hasLoaded) {
-              await new Promise(resolve => scene.addEventListener("loaded", resolve, { once: true }));
-            }
+  // IMPORTANT: WebXR's immersive session request must happen directly
+  // inside the user's click/tap. Do not await anything before enterVR().
+  function enterVRNow(evt) {
+    if (starting) return;
+    starting = true;
+    status.textContent = "Requesting immersive VR...";
 
-            if (!navigator.xr) {
-              throw new Error("WebXR is not available here. Open this link in Meta Quest Browser.");
-            }
+    try {
+      if (!navigator.xr) {
+        reset("WebXR is not available. Open this link directly in Meta Quest Browser.");
+        return;
+      }
 
-            const supported = await navigator.xr.isSessionSupported("immersive-vr");
-            if (!supported) {
-              throw new Error("Immersive VR is not supported on this page.");
-            }
+      if (!scene || !scene.hasLoaded) {
+        reset("The VR scene is still loading. Tap again in a moment.");
+        return;
+      }
 
-            await scene.enterVR();
-          } catch (err) {
-            console.error(err);
-            status.textContent = err && err.message ? err.message : "Could not enter VR.";
-            starting = false;
-          }
+      // Direct call during the user gesture.
+      const result = scene.enterVR();
+
+      // A-Frame versions differ on whether enterVR returns a Promise.
+      if (result && typeof result.catch === "function") {
+        result.catch(function (err) {
+          console.error("enterVR rejected:", err);
+          reset("VR request failed: " + (err && err.message ? err.message : String(err)));
+        });
+      }
+
+      // Never leave the user trapped forever.
+      setTimeout(function () {
+        if (!scene.is("vr-mode")) {
+          reset("Quest did not start immersive VR. Tap again. If it still fails, use the diagnostic message below.");
         }
+      }, 5000);
+    } catch (err) {
+      console.error("enterVR threw:", err);
+      reset("VR request failed: " + (err && err.message ? err.message : String(err)));
+    }
+  }
 
-        gate.addEventListener("pointerdown", enterVR, {passive:true});
-        gate.addEventListener("touchend", enterVR, {passive:true});
-        gate.addEventListener("click", enterVR);
+  // Use CLICK only so one physical action triggers one request.
+  gate.addEventListener("click", enterVRNow);
 
-        scene.addEventListener("enter-vr", function () {
-          gate.style.display = "none";
-          starting = false;
-        });
+  scene.addEventListener("enter-vr", function () {
+    gate.style.display = "none";
+    starting = false;
+    status.textContent = "";
+  });
 
-        scene.addEventListener("exit-vr", function () {
-          gate.style.display = "flex";
-          status.textContent = "";
-          starting = false;
-        });
-      })();
-    </script>
+  scene.addEventListener("exit-vr", function () {
+    gate.style.display = "flex";
+    reset("");
+  });
+
+  window.addEventListener("unhandledrejection", function (event) {
+    const reason = event.reason;
+    console.error("Unhandled rejection:", reason);
+    reset("VR error: " + (reason && reason.message ? reason.message : String(reason)));
+  });
+})();
+</script>
 
   </body>
 </html>
