@@ -176,53 +176,46 @@
         <span style="color: white;">Advanced:</span> Hold thumbstick up/down before shooting to control length. Hold
         grip button for sharper turns.
       </p>
-      <p style="color: white;"><strong>Quest 3 patch:</strong> Wake both controllers, then press the button below.</p>
-      <div style="display:flex; justify-content:center; align-items:center; margin:28px 0;">
-        <button id="enter-vr-custom" type="button"
-          style="
-            padding: 22px 44px;
-            border: 4px solid white;
-            border-radius: 16px;
-            background: #111;
-            color: white;
-            font: 800 28px Arial, sans-serif;
-            box-shadow: 0 8px 20px rgba(0,0,0,.4);
-            cursor: pointer;
-          ">
-          ENTER VR
-        </button>
-      </div>
-      <div id="vr-status"
-        style="
-          margin: 12px auto 0;
-          padding: 10px 14px;
-          border-radius: 8px;
-          background: rgba(0,0,0,.72);
-          color: white;
-          font: 16px Arial, sans-serif;
-          display: none;
-          max-width: 90%;
-          text-align: center;
-        ">
-      </div>
+      <p style="color: white;"><strong>Quest 3 patch:</strong> Open this page, then tap anywhere on the screen to enter VR.</p>
+      
       <p style="font-size: 12px;">Unofficial, fan-made, open source - <a href="https://github.com/talkol/spiderman" style="font-size: 12px; color: black;">https://github.com/talkol/spiderman</a></p>
     </div>
 
   
+    <div id="vr-gate" style="
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
+      background: rgba(164,0,0,0.96);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-family: Arial, sans-serif;
+      cursor: pointer;
+      touch-action: manipulation;
+      user-select: none;
+    ">
+      <div style="font-size: 42px; font-weight: 900; margin-bottom: 18px;">SPIDER GUY VR</div>
+      <div style="font-size: 30px; font-weight: 800; border: 4px solid white; border-radius: 18px; padding: 22px 34px; background:#111;">
+        TAP ANYWHERE TO ENTER VR
+      </div>
+      <div id="vr-gate-status" style="font-size:18px; margin-top:18px; max-width:80%;"></div>
+    </div>
+
     <script>
       (function () {
-        const button = document.getElementById("enter-vr-custom");
-        const status = document.getElementById("vr-status");
+        const gate = document.getElementById("vr-gate");
+        const status = document.getElementById("vr-gate-status");
         const scene = document.querySelector("a-scene");
+        let starting = false;
 
-        function showStatus(message) {
-          status.textContent = message;
-          status.style.display = "block";
-        }
-
-        button.addEventListener("click", async function () {
-          button.disabled = true;
-          button.textContent = "STARTING VR...";
+        async function enterVR() {
+          if (starting) return;
+          starting = true;
+          status.textContent = "Starting VR...";
 
           try {
             if (!scene.hasLoaded) {
@@ -230,31 +223,35 @@
             }
 
             if (!navigator.xr) {
-              throw new Error("WebXR is not available in this browser. Open this page in Meta Quest Browser.");
+              throw new Error("WebXR is not available here. Open this link in Meta Quest Browser.");
             }
 
             const supported = await navigator.xr.isSessionSupported("immersive-vr");
             if (!supported) {
-              throw new Error("Immersive VR is not available on this page/browser.");
+              throw new Error("Immersive VR is not supported on this page.");
             }
 
             await scene.enterVR();
           } catch (err) {
-            console.error("ENTER VR failed:", err);
-            showStatus(err && err.message ? err.message : "Could not enter VR.");
-            button.disabled = false;
-            button.textContent = "TRY ENTER VR AGAIN";
+            console.error(err);
+            status.textContent = err && err.message ? err.message : "Could not enter VR.";
+            starting = false;
           }
-        });
+        }
+
+        gate.addEventListener("pointerdown", enterVR, {passive:true});
+        gate.addEventListener("touchend", enterVR, {passive:true});
+        gate.addEventListener("click", enterVR);
 
         scene.addEventListener("enter-vr", function () {
-          button.textContent = "VR STARTED";
-          status.style.display = "none";
+          gate.style.display = "none";
+          starting = false;
         });
 
         scene.addEventListener("exit-vr", function () {
-          button.disabled = false;
-          button.textContent = "ENTER VR";
+          gate.style.display = "flex";
+          status.textContent = "";
+          starting = false;
         });
       })();
     </script>
